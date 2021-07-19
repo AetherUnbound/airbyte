@@ -96,6 +96,9 @@ public class DefaultJobPersistence implements JobPersistence {
   private static final JSONFormat DB_JSON_FORMAT = new JSONFormat().recordFormat(RecordFormat.OBJECT);
   protected static final String DEFAULT_SCHEMA = "public";
   private static final String BACKUP_SCHEMA = "import_backup";
+  public static final String DEPLOYMENT_ID_KEY = "deployment_id";
+  public static final String METADATA_KEY_COL = "KEY";
+  public static final String METADATA_VAL_COL = "value";
 
   @VisibleForTesting
   static final String BASE_JOB_SELECT_AND_JOIN =
@@ -449,18 +452,55 @@ public class DefaultJobPersistence implements JobPersistence {
   public Optional<String> getVersion() throws IOException {
     final Result<Record> result = database.query(ctx -> ctx.select()
         .from(AIRBYTE_METADATA_TABLE)
-        .where(DSL.field("key").eq(AirbyteVersion.AIRBYTE_VERSION_KEY_NAME))
+        .where(DSL.field(METADATA_KEY_COL).eq(AirbyteVersion.AIRBYTE_VERSION_KEY_NAME))
         .fetch());
-    return result.stream().findFirst().map(r -> r.getValue("value", String.class));
+    return result.stream().findFirst().map(r -> r.getValue(METADATA_VAL_COL, String.class));
   }
 
   @Override
   public void setVersion(String airbyteVersion) throws IOException {
     database.query(ctx -> ctx.execute(String.format(
-        "INSERT INTO %s VALUES('%s', '%s'), ('%s_init_db', '%s') ON CONFLICT (key) DO UPDATE SET value = '%s'",
+        "INSERT INTO %s(%s, %s) VALUES('%s', '%s'), ('%s_init_db', '%s') ON CONFLICT (%s) DO UPDATE SET %s = '%s'",
         AIRBYTE_METADATA_TABLE,
-        AirbyteVersion.AIRBYTE_VERSION_KEY_NAME, airbyteVersion,
-        current_timestamp(), airbyteVersion, airbyteVersion)));
+        METADATA_KEY_COL,
+        METADATA_VAL_COL,
+        AirbyteVersion.AIRBYTE_VERSION_KEY_NAME,
+        airbyteVersion,
+        current_timestamp(),
+        airbyteVersion,
+        METADATA_KEY_COL,
+        METADATA_VAL_COL,
+        airbyteVersion)));
+  }
+
+  @Override
+  public Optional<UUID> getDeployment() throws IOException {
+    final Result<Record> result = database.query(ctx -> ctx.select()
+        .from(AIRBYTE_METADATA_TABLE)
+        .where(DSL.field(METADATA_KEY_COL).eq(DEPLOYMENT_ID_KEY))
+        .fetch());
+    return result.stream().findFirst().map(r -> UUID.fromString(r.getValue(METADATA_VAL_COL, String.class)));
+  }
+
+  @Override
+  public void setDeployment(UUID deployment) throws IOException {
+    final UUID committedDeploymentId = database.query(ctx -> ctx.fetch(String.format(
+        "INSERT INTO %s(%s, %s) VALUES('%s', '%s') ON CONFLICT (%s) DO NOTHING RETURNING %s",
+        AIRBYTE_METADATA_TABLE,
+        METADATA_KEY_COL,
+        METADATA_VAL_COL,
+        DEPLOYMENT_ID_KEY,
+        deployment,
+        METADATA_KEY_COL,
+        METADATA_VAL_COL)))
+        .stream()
+        .map(record -> UUID.fromString(record.get(METADATA_KEY_COL, String.class)))
+        .findFirst()
+        .orElseThrow();
+
+    if (!deployment.equals(committedDeploymentId)) {
+      LOGGER.warn("Attempted to set a deployment id %s, but deployment id %s already set. Retained original value.");
+    }
   }
 
   private static String current_timestamp() {
@@ -674,7 +714,11 @@ public class DefaultJobPersistence implements JobPersistence {
    */
   private static void registerImportMetadata(final DSLContext ctx, final String airbyteVersion) {
     ctx.execute(String.format("INSERT INTO %s VALUES('%s_import_db', '%s');", AIRBYTE_METADATA_TABLE, current_timestamp(), airbyteVersion));
-    ctx.execute(String.format("UPDATE %s SET value = '%s' WHERE key = '%s';", AIRBYTE_METADATA_TABLE, airbyteVersion,
+    ctx.execute(String.format("UPDATE %s SET %s = '%s' WHERE %s = '%s';",
+        AIRBYTE_METADATA_TABLE,
+        METADATA_VAL_COL,
+        airbyteVersion,
+        METADATA_KEY_COL,
         AirbyteVersion.AIRBYTE_VERSION_KEY_NAME));
   }
 
