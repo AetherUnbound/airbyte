@@ -97,7 +97,7 @@ public class DefaultJobPersistence implements JobPersistence {
   protected static final String DEFAULT_SCHEMA = "public";
   private static final String BACKUP_SCHEMA = "import_backup";
   public static final String DEPLOYMENT_ID_KEY = "deployment_id";
-  public static final String METADATA_KEY_COL = "KEY";
+  public static final String METADATA_KEY_COL = "key";
   public static final String METADATA_VAL_COL = "value";
 
   @VisibleForTesting
