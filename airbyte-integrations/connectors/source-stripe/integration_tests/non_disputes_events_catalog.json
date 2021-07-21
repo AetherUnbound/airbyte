@@ -2120,7 +2120,7 @@
               "type": ["null", "object"],
               "properties": {
                 "end": {
-                  "type": ["null", "string"],
+                  "type": ["null", "number"],
                   "format": "date-time"
                 },
                 "coupon": {
@@ -2174,7 +2174,7 @@
                       "type": ["null", "number"]
                     },
                     "created": {
-                      "type": ["null", "string"],
+                      "type": ["null", "number"],
                       "format": "date-time"
                     }
                   }
@@ -2183,7 +2183,7 @@
                   "type": ["null", "string"]
                 },
                 "start": {
-                  "type": ["null", "string"],
+                  "type": ["null", "number"],
                   "format": "date-time"
                 },
                 "object": {
@@ -3256,7 +3256,7 @@
               "type": ["null", "object"],
               "properties": {
                 "end": {
-                  "type": ["null", "string"],
+                  "type": ["null", "number"],
                   "format": "date-time"
                 },
                 "coupon": {

@@ -878,7 +878,7 @@
               "type": ["null", "number"]
             },
             "created": {
-              "type": ["null", "string"],
+              "type": ["null", "number"],
               "format": "date-time"
             }
           }
@@ -887,7 +887,7 @@
           "type": ["null", "string"]
         },
         "start": {
-          "type": ["null", "string"],
+          "type": ["null", "number"],
           "format": "date-time"
         },
         "object": {
