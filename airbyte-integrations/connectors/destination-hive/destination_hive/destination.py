@@ -21,11 +21,16 @@
 # SOFTWARE.
 
 
+import json
+import tempfile
 from typing import Mapping, Any, Iterable
 
 from airbyte_cdk import AirbyteLogger
 from airbyte_cdk.destinations import Destination
-from airbyte_cdk.models import AirbyteConnectionStatus, ConfiguredAirbyteCatalog, AirbyteMessage, Status
+from airbyte_cdk.models import AirbyteConnectionStatus, ConfiguredAirbyteCatalog, AirbyteMessage, Status, \
+    DestinationSyncMode
+
+from .client import HiveClient
 
 
 class DestinationHive(Destination):
@@ -51,8 +56,23 @@ class DestinationHive(Destination):
         :param input_messages: The stream of input messages received from the source
         :return: Iterable of AirbyteStateMessages wrapped in AirbyteMessage structs
         """
+        for configured_stream in configured_catalog.streams:
+            client = HiveClient(**config, stream=configured_stream.stream.name)
+            overwrite = configured_stream.destination_sync_mode == DestinationSyncMode.overwrite
 
-        pass
+        with writer:
+            for message in input_messages:
+                if message.type == Type.STATE:
+                    # Emitting a state message indicates that all records which came
+                    # before it have been written to the destination. We don't need to
+                    # do anything specific to save the data so we just re-emit these
+                    yield message
+                elif message.type == Type.RECORD:
+                    record = message.record
+                    writer.write(record.data)
+                else:
+                    # ignore other message types for now
+                    continue
 
     def check(self, logger: AirbyteLogger, config: Mapping[str, Any]) -> AirbyteConnectionStatus:
         """

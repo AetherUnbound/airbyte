@@ -21,9 +21,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 #
-
-import json
-from typing import List, Optional, Dict
+import contextlib
+from typing import List, Optional, Tuple
 
 import impala.dbapi
 from impala.interface import Cursor, Connection
@@ -35,6 +34,7 @@ class HiveClient:
         host: str,
         username: str,
         password: str,
+        stream: str,
         database: str = "default",
         port: int = 10000,
     ):
@@ -43,14 +43,8 @@ class HiveClient:
         self.username = username
         self.password = password
         self.database = database
-        self._conn: Optional[Connection] = None
-        self._cursor: Optional[Cursor] = None
-
-    def __enter__(self):
-        return self.cursor
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
+        self.stream = stream
+        self.table = self.get_table(stream)
 
     def get_conn(self) -> Connection:
         conn = impala.dbapi.connect(
@@ -62,36 +56,38 @@ class HiveClient:
         )
         return conn
 
-    def _open(self):
-        self._conn = self.get_conn()
-        self._cursor = self._conn.cursor()
-
-    @property
-    def cursor(self):
-        if self._conn is None:
-            self._open()
-        return self._cursor
-
-    def close(self):
-        if self._cursor:
-            self._cursor.close()
-        if self._conn:
-            self._conn.close()
-
-    def open(self):
-        self.close()
-        self._open()
-        return self
-
-    def get_table(self, stream: str) -> str:
+    @staticmethod
+    def get_table(stream: str) -> str:
         return f"airbyte_json_{stream}"
 
-    def write(self, record: Dict, stream: str) -> None:
-        ...
+    def execute(self, sql: str, fetch: bool = False) -> Optional[List[Tuple]]:
+        conn: Connection
+        cursor: Cursor
+        with contextlib.closing(self.get_conn()) as conn:
+            with contextlib.closing(conn.cursor()) as cursor:
+                cursor.execute(sql)
+                if fetch:
+                    return cursor.fetchall()
 
+    def create_table(self) -> None:
+        self.execute(
+            f"""
+CREATE TABLE IF NOT EXISTS {self.table} (
+    json_data string
+);   
+"""
+        )
 
-    def read_data(self) -> List[Dict]:
-        ...
+    def load_data(self, path: str, overwrite: bool = False) -> None:
+        self.create_table()
+        self.execute(
+            f"""
+LOAD DATA LOCAL INPATH '{path}' {"OVERWRITE" if overwrite else ""} INTO TABLE {self.table}
+"""
+        )
 
-    def delete(self) -> None:
-        ...
+    def read_data(self) -> List[Tuple]:
+        data = self.execute(f"SELECT * FROM {self.table} LIMIT 1000;")
+        if not data:
+            raise ValueError(f"Query on {self.table} returned no results!")
+        return data
