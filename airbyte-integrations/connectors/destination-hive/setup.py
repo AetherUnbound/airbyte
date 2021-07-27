@@ -27,6 +27,7 @@ from setuptools import find_packages, setup
 
 MAIN_REQUIREMENTS = [
     "airbyte-cdk",
+    "impyla==0.17.0"
 ]
 
 TEST_REQUIREMENTS = [
