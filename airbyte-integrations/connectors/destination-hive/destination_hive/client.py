@@ -74,12 +74,12 @@ class HiveClient:
             f"""
 CREATE TABLE IF NOT EXISTS {self.table} (
     json_data string
-);   
+);
 """
         )
 
     def drop_table(self) -> None:
-        self.execute(f"DROP TABLE {self.table} PURGE ")
+        self.execute(f"DROP TABLE {self.table} PURGE;")
 
     def load_data(self, path: str, overwrite: bool = False) -> None:
         self.create_table()
@@ -92,7 +92,7 @@ INTO TABLE {self.table};
         )
 
     def read_data(self) -> List[Tuple]:
-        data = self.execute(f"SELECT * FROM {self.table} LIMIT 1000;")
+        data = self.execute(f"SELECT * FROM {self.table} LIMIT 1000;", fetch=True)
         if not data:
             raise ValueError(f"Query on {self.table} returned no results!")
         return data
