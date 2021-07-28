@@ -23,26 +23,32 @@
 
 import json
 import tempfile
+import uuid
 from typing import Mapping, Any, Iterable
 
 from airbyte_cdk import AirbyteLogger
 from airbyte_cdk.destinations import Destination
-from airbyte_cdk.models import AirbyteConnectionStatus, ConfiguredAirbyteCatalog, AirbyteMessage, Status, \
-    DestinationSyncMode
+from airbyte_cdk.models import (
+    AirbyteConnectionStatus,
+    ConfiguredAirbyteCatalog,
+    AirbyteMessage,
+    Status,
+    DestinationSyncMode,
+    Type,
+)
 
 from .client import HiveClient
 
 
 class DestinationHive(Destination):
     def write(
-            self,
-            config: Mapping[str, Any],
-            configured_catalog: ConfiguredAirbyteCatalog,
-            input_messages: Iterable[AirbyteMessage]
+        self,
+        config: Mapping[str, Any],
+        configured_catalog: ConfiguredAirbyteCatalog,
+        input_messages: Iterable[AirbyteMessage],
     ) -> Iterable[AirbyteMessage]:
 
         """
-        TODO
         Reads the input stream of messages, config, and catalog to write data to the destination.
 
         This method returns an iterable (typically a generator of AirbyteMessages via yield) containing state messages received
@@ -58,23 +64,33 @@ class DestinationHive(Destination):
         """
         for configured_stream in configured_catalog.streams:
             client = HiveClient(**config, stream=configured_stream.stream.name)
-            overwrite = configured_stream.destination_sync_mode == DestinationSyncMode.overwrite
+            overwrite = (
+                configured_stream.destination_sync_mode == DestinationSyncMode.overwrite
+            )
+            with tempfile.NamedTemporaryFile(suffix=".jsonl") as file:
+                for message in input_messages:
+                    if message.type == Type.STATE:
+                        # Emitting a state message indicates that all records which came
+                        # before it have been written to the destination. We don't need to
+                        # do anything specific to save the data so we just re-emit these
+                        yield message
+                    elif message.type == Type.RECORD:
+                        record = message.record
+                        line = f"{json.dumps(record)}\n"
+                        file.write(line)
+                    else:
+                        # ignore other message types for now
+                        continue
+                # Now that all the data is in the local temp file, insert that file
+                # into the hive table
+                self.logger.info(
+                    "Writing to temporary file complete, ingesting into Hive"
+                )
+                client.load_data(file.name, overwrite)
 
-        with writer:
-            for message in input_messages:
-                if message.type == Type.STATE:
-                    # Emitting a state message indicates that all records which came
-                    # before it have been written to the destination. We don't need to
-                    # do anything specific to save the data so we just re-emit these
-                    yield message
-                elif message.type == Type.RECORD:
-                    record = message.record
-                    writer.write(record.data)
-                else:
-                    # ignore other message types for now
-                    continue
-
-    def check(self, logger: AirbyteLogger, config: Mapping[str, Any]) -> AirbyteConnectionStatus:
+    def check(
+        self, logger: AirbyteLogger, config: Mapping[str, Any]
+    ) -> AirbyteConnectionStatus:
         """
         Tests if the input configuration can be used to successfully connect to the destination with the needed permissions
             e.g: if a provided API token or password can be used to connect and write to the destination.
@@ -87,11 +103,12 @@ class DestinationHive(Destination):
         :return: AirbyteConnectionStatus indicating a Success or Failure
         """
         try:
-            # TODO
-
+            stream = f"_airbyte_connection_test_{str(uuid.uuid4()).replace('-', '_')}"
+            client = HiveClient(**config, stream=stream)
+            client.create_table()
+            client.drop_table()
             return AirbyteConnectionStatus(status=Status.SUCCEEDED)
         except Exception as e:
-            return AirbyteConnectionStatus(status=Status.FAILED, message=f"An exception occurred: {repr(e)}")
-
-
-
+            return AirbyteConnectionStatus(
+                status=Status.FAILED, message=f"An exception occurred: {repr(e)}"
+            )

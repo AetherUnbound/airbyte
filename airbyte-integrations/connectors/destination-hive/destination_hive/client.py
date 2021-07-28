@@ -78,11 +78,16 @@ CREATE TABLE IF NOT EXISTS {self.table} (
 """
         )
 
+    def drop_table(self) -> None:
+        self.execute(f"DROP TABLE {self.table} PURGE ")
+
     def load_data(self, path: str, overwrite: bool = False) -> None:
         self.create_table()
         self.execute(
             f"""
-LOAD DATA LOCAL INPATH '{path}' {"OVERWRITE" if overwrite else ""} INTO TABLE {self.table}
+LOAD DATA LOCAL INPATH '{path}'
+{"OVERWRITE" if overwrite else ""}
+INTO TABLE {self.table};
 """
         )
 
