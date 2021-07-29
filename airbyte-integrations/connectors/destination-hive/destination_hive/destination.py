@@ -67,7 +67,7 @@ class DestinationHive(Destination):
             overwrite = (
                 configured_stream.destination_sync_mode == DestinationSyncMode.overwrite
             )
-            with tempfile.NamedTemporaryFile(suffix=".jsonl") as file:
+            with tempfile.NamedTemporaryFile(suffix=".jsonl", mode="w+") as file:
                 for message in input_messages:
                     if message.type == Type.STATE:
                         # Emitting a state message indicates that all records which came
@@ -76,7 +76,7 @@ class DestinationHive(Destination):
                         yield message
                     elif message.type == Type.RECORD:
                         record = message.record
-                        line = f"{json.dumps(record)}\n"
+                        line = f"{json.dumps(record.data)}\n"
                         file.write(line)
                     else:
                         # ignore other message types for now

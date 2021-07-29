@@ -53,6 +53,7 @@ class HiveClient:
             user=self.username,
             password=self.password,
             database=self.database,
+            auth_mechanism="PLAIN",
         )
         return conn
 
@@ -74,12 +75,12 @@ class HiveClient:
             f"""
 CREATE TABLE IF NOT EXISTS {self.table} (
     json_data string
-);
+)
 """
         )
 
     def drop_table(self) -> None:
-        self.execute(f"DROP TABLE {self.table} PURGE;")
+        self.execute(f"DROP TABLE {self.table} PURGE")
 
     def load_data(self, path: str, overwrite: bool = False) -> None:
         self.create_table()
@@ -87,12 +88,12 @@ CREATE TABLE IF NOT EXISTS {self.table} (
             f"""
 LOAD DATA LOCAL INPATH '{path}'
 {"OVERWRITE" if overwrite else ""}
-INTO TABLE {self.table};
+INTO TABLE {self.table}
 """
         )
 
     def read_data(self) -> List[Tuple]:
-        data = self.execute(f"SELECT * FROM {self.table} LIMIT 1000;", fetch=True)
+        data = self.execute(f"SELECT * FROM {self.table} LIMIT 1000", fetch=True)
         if not data:
             raise ValueError(f"Query on {self.table} returned no results!")
         return data

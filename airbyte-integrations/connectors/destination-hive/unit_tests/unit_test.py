@@ -49,14 +49,14 @@ def test_create_table(cursor_mock, client):
     sql = """
 CREATE TABLE IF NOT EXISTS airbyte_json_mystream (
     json_data string
-);
+)
 """
     cursor_mock.execute.assert_called_with(sql)
 
 
 def test_drop_table(cursor_mock, client):
     client.drop_table()
-    sql = f"DROP TABLE {client.table} PURGE;"
+    sql = f"DROP TABLE {client.table} PURGE"
     cursor_mock.execute.assert_called_with(sql)
 
 
@@ -68,7 +68,7 @@ def test_drop_table(cursor_mock, client):
             """
 LOAD DATA LOCAL INPATH '/test/path'
 
-INTO TABLE airbyte_json_mystream;
+INTO TABLE airbyte_json_mystream
 """,
         ),
         (
@@ -76,7 +76,7 @@ INTO TABLE airbyte_json_mystream;
             """
 LOAD DATA LOCAL INPATH '/test/path'
 OVERWRITE
-INTO TABLE airbyte_json_mystream;
+INTO TABLE airbyte_json_mystream
 """,
         ),
     ],
